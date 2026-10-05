@@ -4,11 +4,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import statsmodels.formula.api as smf
+import statsmodels.api as sm
 import pingouin as pg
 
 
 iv = "track"
-RESULTS_DIR = "/home/appuser/data/track_analysis_selected"
+RESULTS_DIR = "/home/appuser/data/balanced_2x3"
 ALPHA = 0.05
 
 os.makedirs(f"{RESULTS_DIR}/figures", exist_ok=True)
@@ -143,6 +144,51 @@ def normality_test3(df, metrics):
     shapiro_results.to_csv(f"{RESULTS_DIR}/shapiro_wilk_results_2.csv", index=False)
 
 
+def normality_test4(df, metrics):
+    shapiro_results = []
+
+    fig, axes = plt.subplots(2, 4, figsize=(18, 9))
+    axes = axes.flatten()
+
+    for ax, metric in zip(axes, metrics):
+        model = smf.mixedlm(f"{metric} ~ C(track) * C(control_mode)", data=df, groups=df["participant_id"])
+
+        fitted = model.fit()
+
+        residuals = fitted.resid.dropna()
+
+        # print(f"\n{metric}")
+        # print(fitted.summary())
+        # print("Random-effect variance:")
+        # print(fitted.cov_re)
+
+        # Shapiro-Wilk test for normality of residuals
+        stat, p_value = stats.shapiro(residuals)
+
+        shapiro_results.append({
+            "metric": metric,
+            "statistic": stat,
+            "p_value": p_value,
+            "normality": "Normal" if p_value > ALPHA else "Not Normal"
+        })
+
+        # Q-Q plot for residuals
+        sm.qqplot(residuals, line="45", fit=True, ax=ax)
+        ax.set_xlabel("Theoretical Quantiles")
+        ax.set_ylabel("Sample Quantiles")
+        ax.set_title(f"{metric} - Mixed Model Residuals")
+
+    plt.tight_layout()    
+
+    fig.savefig(f"{RESULTS_DIR}/figures/qq_plots.png", dpi=300, bbox_inches='tight')
+
+    plt.close(fig)
+
+    shapiro_results = pd.DataFrame(shapiro_results)
+    shapiro_results.to_csv(f"{RESULTS_DIR}/shapiro_wilk_results.csv", index=False)
+
+
+
 
 def sphericity_test(df, metrics):
     sphericity_results = []
@@ -197,7 +243,7 @@ def main():
     # Load the CSV file into a DataFrame
     # metrics_path = f"/home/appuser/data/metrics.csv"
     
-    metrics_path = f"/home/appuser/data/track_analysis_selected/metrics_selected.csv"
+    metrics_path = f"/home/appuser/data/balanced_2x3/balanced_subset_2x3.csv"
     df = pd.read_csv(metrics_path)
 
     metrics = [
@@ -212,7 +258,7 @@ def main():
     ]
 
     # Track analysis
-    normality_test1(df, metrics)
+    # normality_test1(df, metrics)
 
     # Control analysis
     # normality_test2(df, metrics)
@@ -221,6 +267,9 @@ def main():
     # Per-track control analysis
     # normality_test3(df, metrics)
     # variance_test(df, metrics)
+
+    # LMM
+    normality_test4(df, metrics)
 
 
 if __name__ == "__main__":

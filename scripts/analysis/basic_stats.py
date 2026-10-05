@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-RESULTS_DIR = "/home/appuser/data/track_analysis_selected"
-iv = "track"
+RESULTS_DIR = "/home/appuser/data/balanced_2x3"
+iv = ["track", "control_mode"]
 
 
 
@@ -50,8 +50,14 @@ def compute_histograms(df, metrics):
     fig, axes = plt.subplots(2, 4, figsize=(18,9))
     axes = axes.flatten()
 
+    # LMM
+    df = df.copy()
+    df["track_mode"] = df["track"] + "_" + df["control_mode"]
+
     for ax, metric in zip(axes, metrics):
-        sns.histplot(data=df, x=metric, hue=iv, bins=15, kde=True, element="step", stat="density", common_norm=False, ax=ax)
+        # sns.histplot(data=df, x=metric, hue=iv, bins=15, kde=True, element="step", stat="density", common_norm=False, ax=ax)
+        # LMM
+        sns.histplot(data=df, x=metric, hue="track_mode", bins=15, kde=True, element="step", stat="density", common_norm=False, ax=ax)
 
         ax.set_title(metric)
         ax.set_xlabel("")
@@ -71,8 +77,15 @@ def compute_boxplots(df, metrics):
     fig, axes = plt.subplots(2, 4, figsize=(18,9))
     axes = axes.flatten()
 
+    # LMM
+    df = df.copy()
+    df["track_mode"] = df["track"] + "_" + df["control_mode"]
+
     for ax, metric in zip(axes, metrics):
-        sns.boxplot(data=df, x=iv, y=metric, ax=ax)
+        # sns.boxplot(data=df, x=iv, y=metric, ax=ax)
+        # LMM
+        sns.boxplot(data=df, x="track_mode", y=metric, ax=ax)
+
 
         ax.set_title(metric)
         ax.set_xlabel("")
@@ -93,7 +106,7 @@ def main():
     # Load the CSV file into a DataFrame
     # metrics_path = f"/home/appuser/data/metrics.csv"
     # metrics_path = f"/home/appuser/data/balanced_T1/balanced_subset_T1.csv"
-    metrics_path = f"/home/appuser/data/track_analysis_selected/metrics_selected.csv"
+    metrics_path = f"/home/appuser/data/balanced_2x3/balanced_subset_2x3.csv"
     df = pd.read_csv(metrics_path)
 
     metrics = [
