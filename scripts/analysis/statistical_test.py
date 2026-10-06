@@ -88,6 +88,8 @@ def within_subjects_omnibus(df, metrics, shapiro_results, sphericity_results):
 
     for metric in metrics:
         data = df[[ "participant_id", iv, metric]].dropna()
+        wide = data.pivot(index="participant_id", columns=iv, values=metric).dropna()
+        data = wide.reset_index().melt(id_vars="participant_id", var_name=iv, value_name=metric)
 
         # Extract normality result from Shapiro-Wilk test results
         normality = shapiro_results.loc[shapiro_results["metric"] == metric, "normality"].values[0]
@@ -115,16 +117,15 @@ def within_subjects_omnibus(df, metrics, shapiro_results, sphericity_results):
 
         else:
             # Friedman test
-            wide = data.pivot(index="participant_id", columns=iv, values=metric).dropna()
-            modes = list(wide.columns)
-            samples = [wide[mode].values for mode in modes]
+            modes = list(data.columns)
+            samples = [data[mode].values for mode in modes]
 
             statistic, p_value = stats.friedmanchisquare(*samples)
 
             test_name = "Friedman Test"
 
             # Kendall's W as effect size for Friedman test
-            n = len(wide)
+            n = len(data)
             k = len(modes)
 
             kendalls_w = statistic / (n * (k - 1))

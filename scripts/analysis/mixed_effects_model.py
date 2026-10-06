@@ -6,7 +6,7 @@ from scipy import stats
 from statsmodels.stats.multitest import multipletests
 
 
-RESULTS_DIR = "/home/appuser/data/balanced_2x3"
+RESULTS_DIR = "/home/appuser/data/lmm"
 ALPHA = 0.05
 
 METRICS = [
@@ -25,6 +25,8 @@ def fit_mixed_effects_model(df, metric):
     # Fit the mixed-effects model
     model = smf.mixedlm(f"{metric} ~ C(track) * C(control_mode)", data=df, groups=df["participant_id"])
     result = model.fit()
+
+    print(result.converged)
 
     omnibus = result.wald_test_terms()
 
@@ -136,22 +138,41 @@ def posthoc_interaction(result, metric):
         
 
 def posthoc_control_mode(result, metric):
+    print(result.fe_params)
+
     beta = result.fe_params
     cov_beta = result.cov_params().loc[beta.index, beta.index]
 
 
     # Estimated marginal means for control modes averaged across tracks
-    design = {
-        "joy":   np.array([1, 0.5, 0, 0, 0,   0  ]),
-        "palm":  np.array([1, 0.5, 1, 0, 0.5, 0  ]),
-        "pinch": np.array([1, 0.5, 0, 1, 0,   0.5])
-    }
+    # design = {
+    #     "joy":   np.array([1, 0.5, 0, 0, 0,   0  ]),
+    #     "palm":  np.array([1, 0.5, 1, 0, 0.5, 0  ]),
+    #     "pinch": np.array([1, 0.5, 0, 1, 0,   0.5])
+    # }
 
+    # comparisons = [
+    #     ("joy", "palm"),
+    #     ("joy", "pinch"),
+    #     ("palm", "pinch")
+    # ]
+
+    design = {
+        "holo_joy": np.array([1, 0.5, 0,   0,   0,   0.5, 0,   0  ]),
+        "joy":      np.array([1, 0.5, 1,   0,   0,   0,   0,   0  ]),
+        "palm":     np.array([1, 0.5, 0,   1,   0,   0,   0.5, 0  ]),
+        "pinch":    np.array([1, 0.5, 0,   0,   1,   0,   0,   0.5])
+    }
+    
     comparisons = [
+        ("holo_joy", "joy"),
+        ("holo_joy", "palm"),
+        ("holo_joy", "pinch"),
         ("joy", "palm"),
         ("joy", "pinch"),
         ("palm", "pinch")
     ]
+    
 
     results = []
 
@@ -251,7 +272,7 @@ def posthoc_track(result, metric):
     
 
 def main():
-    metrics_path = f"{RESULTS_DIR}/balanced_subset_2x3.csv"
+    metrics_path = f"/home/appuser/data/metrics.csv"
     df = pd.read_csv(metrics_path)
 
     all_omnibus_results = []
@@ -261,17 +282,17 @@ def main():
         result, omnibus_results, track_significance, control_mode_significance, interaction_significance = fit_mixed_effects_model(df, metric)
         all_omnibus_results.append(omnibus_results)
 
-        if interaction_significance:
-            posthoc_result = posthoc_interaction(result, metric)
-            all_posthoc_results.append(posthoc_result)
+        # if interaction_significance:
+        #     posthoc_result = posthoc_interaction(result, metric)
+        #     all_posthoc_results.append(posthoc_result)
 
         if control_mode_significance:
             posthoc_result = posthoc_control_mode(result, metric)
             all_posthoc_results.append(posthoc_result)
 
-        if track_significance:
-            posthoc_result = posthoc_track(result, metric)
-            all_posthoc_results.append(posthoc_result)
+        # if track_significance:
+        #     posthoc_result = posthoc_track(result, metric)
+        #     all_posthoc_results.append(posthoc_result)
 
 
     all_omnibus_results = pd.concat(all_omnibus_results, ignore_index=True)

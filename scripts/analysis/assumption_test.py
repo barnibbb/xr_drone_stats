@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.stats as stats
@@ -9,7 +10,7 @@ import pingouin as pg
 
 
 iv = "track"
-RESULTS_DIR = "/home/appuser/data/balanced_2x3"
+RESULTS_DIR = "/home/appuser/data/lmm"
 ALPHA = 0.05
 
 os.makedirs(f"{RESULTS_DIR}/figures", exist_ok=True)
@@ -146,6 +147,7 @@ def normality_test3(df, metrics):
 
 def normality_test4(df, metrics):
     shapiro_results = []
+    qq_deviation_results = []
 
     fig, axes = plt.subplots(2, 4, figsize=(18, 9))
     axes = axes.flatten()
@@ -157,10 +159,34 @@ def normality_test4(df, metrics):
 
         residuals = fitted.resid.dropna()
 
-        # print(f"\n{metric}")
-        # print(fitted.summary())
-        # print("Random-effect variance:")
-        # print(fitted.cov_re)
+        # Quantitative check for normality
+        residuals_sorted = np.sort(residuals)
+        n = len(residuals_sorted)
+
+        observed_z = (residuals_sorted - np.mean(residuals_sorted)) / np.std(residuals_sorted, ddof=1)
+        probabilities = (np.arange(1, n + 1) - 0.5) / n
+        expected_z = stats.norm.ppf(probabilities)
+
+        qq_deviation = observed_z - expected_z
+        abs_deviation = np.abs(qq_deviation)
+
+        thresholds = [0.25, 0.50, 1.0]
+
+        # Store deviation results
+        qq_deviation_results.append({
+            "metric": metric,
+            "n": n,
+            "max_abs_deviation": np.max(abs_deviation),
+            "mean_abs_deviation": np.mean(abs_deviation),
+            "median_abs_deviation": np.median(abs_deviation),
+            "n_abs_dev_gt_0.25": np.sum(abs_deviation > 0.25),
+            "pct_abs_dev_gt_0.25": 100 * np.mean(abs_deviation > 0.25),
+            "n_abs_dev_gt_0.50": np.sum(abs_deviation > 0.50),
+            "pct_abs_dev_gt_0.50": 100 * np.mean(abs_deviation > 0.50),
+            "n_abs_dev_gt_1.00": np.sum(abs_deviation > 1.00),
+            "pct_abs_dev_gt_1.00": 100 * np.mean(abs_deviation > 1.00)
+        })
+
 
         # Shapiro-Wilk test for normality of residuals
         stat, p_value = stats.shapiro(residuals)
@@ -186,6 +212,10 @@ def normality_test4(df, metrics):
 
     shapiro_results = pd.DataFrame(shapiro_results)
     shapiro_results.to_csv(f"{RESULTS_DIR}/shapiro_wilk_results.csv", index=False)
+
+    # Save Q-Q deviation results separately
+    qq_deviation_results = pd.DataFrame(qq_deviation_results)
+    qq_deviation_results.to_csv(f"{RESULTS_DIR}/qq_deviation_results.csv", index=False)
 
 
 
@@ -243,7 +273,7 @@ def main():
     # Load the CSV file into a DataFrame
     # metrics_path = f"/home/appuser/data/metrics.csv"
     
-    metrics_path = f"/home/appuser/data/balanced_2x3/balanced_subset_2x3.csv"
+    metrics_path = f"/home/appuser/data/metrics.csv"
     df = pd.read_csv(metrics_path)
 
     metrics = [

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-RESULTS_DIR = "/home/appuser/data/balanced_2x3"
+RESULTS_DIR = "/home/appuser/data/lmm"
 iv = ["track", "control_mode"]
 
 
@@ -86,7 +86,7 @@ def compute_boxplots(df, metrics):
         # LMM
         sns.boxplot(data=df, x="track_mode", y=metric, ax=ax)
 
-
+        ax.tick_params(axis='x', rotation=45)
         ax.set_title(metric)
         ax.set_xlabel("")
         ax.set_ylabel("")
@@ -106,7 +106,7 @@ def main():
     # Load the CSV file into a DataFrame
     # metrics_path = f"/home/appuser/data/metrics.csv"
     # metrics_path = f"/home/appuser/data/balanced_T1/balanced_subset_T1.csv"
-    metrics_path = f"/home/appuser/data/balanced_2x3/balanced_subset_2x3.csv"
+    metrics_path = f"/home/appuser/data/metrics.csv"
     df = pd.read_csv(metrics_path)
 
     metrics = [
