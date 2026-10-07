@@ -2,8 +2,8 @@ import os
 import re
 import yaml
 
+import pandas as pd
 import numpy as np
-from scipy.signal import savgol_filter
 
 # =========================================================================
 # Input data functions
@@ -55,18 +55,62 @@ def load_measurement(trajectory_file):
 
 def waypoint_metrics(waypoints, offset):
     # Transform waypoints to world coordinates
-    points = np.array(
-        [transform_point(wp, offset) for wp in waypoints],
-        dtype=float
-    )
+    points = np.array([transform_point(wp, offset) for wp in waypoints], dtype=float)
 
-    # ---------------------------------------------------------
-    # Track length
-    # ---------------------------------------------------------
+    # Basics
+    n_waypoints = len(points)
+
+    min_xyz = np.min(points, axis=0)
+    max_xyz = np.max(points, axis=0)
+
+    dimensions = max_xyz - min_xyz
+
+
+    # Segment geometry
     segment_vectors = np.diff(points, axis=0)
     segment_lengths = np.linalg.norm(segment_vectors, axis=1)
 
     track_length = np.sum(segment_lengths)
+
+    direct_distance = np.linalg.norm(points[-1] - points[0])
+
+    segment_mean = np.mean(segment_lengths)
+    segment_median = np.median(segment_lengths)
+    segment_std = np.std(segment_lengths, ddof=1)
+    segment_min = np.min(segment_lengths)
+    segment_max = np.max(segment_lengths)
+
+    # Turning angles
+    turning_angles = []
+
+    for i in range(len(segment_vectors) - 1):
+        v1 = segment_vectors[i]
+        v2 = segment_vectors[i + 1]
+
+        # Normalize vectors
+        norm1 = np.linalg.norm(v1)
+        norm2 = np.linalg.norm(v2)
+
+        # Calculate angle in radians
+        cosine = np.dot(v1, v2) / (norm1 * norm2)
+        cosine = np.clip(cosine, -1.0, 1.0)  # Ensure within valid range
+        angle_rad = np.arccos(cosine)
+
+        # Convert to degrees
+        angle_deg = np.degrees(angle_rad)
+
+        turning_angles.append(angle_deg)
+
+    turning_angles = np.array(turning_angles)
+
+    valid_angles = turning_angles[~np.isnan(turning_angles)]
+
+    if len(valid_angles) > 0:
+        mean_turning_angle = np.mean(valid_angles)
+        median_turning_angle = np.median(valid_angles)
+        total_turning_angle = np.sum(valid_angles)
+
+
 
     # ---------------------------------------------------------
     # Curvature
@@ -99,28 +143,53 @@ def waypoint_metrics(waypoints, offset):
 
     curvatures = np.array(curvatures)
 
-    mean_curvature = np.nanmean(curvatures)
+    valid_curvatures = curvatures[~np.isnan(curvatures)]
 
-    return track_length, mean_curvature, curvatures
+    if len(valid_curvatures) > 0:
+        mean_curvature = np.mean(valid_curvatures)
+        median_curvature = np.median(valid_curvatures)
+        std_curvature = np.std(valid_curvatures, ddof=1)
+        max_curvature = np.max(valid_curvatures)
+
+    return {
+        "n_waypoints": n_waypoints,
+        "track_length": track_length,
+        "direct_distance": direct_distance,
+        "segment_mean": segment_mean,
+        "segment_median": segment_median,
+        "mean_turning_angle": mean_turning_angle,
+        "median_turning_angle": median_turning_angle,
+        "total_turning_angle": total_turning_angle,
+        "mean_curvature": mean_curvature,
+        "median_curvature": median_curvature
+    }
 
 
 def main():
-    DATA_DIR = "/home/appuser/data/samples/12_P17/joy_T2"
+    DATA_DIR_1 = "/home/appuser/data/samples/12_P17/joy_T2"
+    DATA_DIR_2 = "/home/appuser/data/samples/12_P17/palm_T1"
 
-    trajectory_file = DATA_DIR + "/measurement_log.yaml"
-    offset_file = DATA_DIR + "/offset.txt"
+    tracks = { "T1": DATA_DIR_1, "T2": DATA_DIR_2 }
 
-    offset = load_offset(offset_file)
+    results = []
 
-    trajectory, waypoints = load_measurement(trajectory_file)
+    for track_name, track_dir in tracks.items():
+        offset_file = os.path.join(track_dir, "offset.txt")
+        trajectory_file = os.path.join(track_dir, "measurement_log.yaml")
 
-    track_length, mean_curvature, curvatures = waypoint_metrics(
-        waypoints,
-        offset
-    )
+        offset = load_offset(offset_file)
+        _, waypoints = load_measurement(trajectory_file)
 
-    print(f"Track length: {track_length:.3f} m")
-    print(f"Mean curvature: {mean_curvature:.6f} 1/m")
+        metrics = waypoint_metrics(waypoints, offset)
+        metrics["track"] = track_name
+
+        results.append(metrics)
+
+    results_df = pd.DataFrame(results)
+    columns = ["track"] + [col for col in results_df.columns if col != "track"]
+
+    results_df = results_df[columns]
+    results_df.to_csv("/home/appuser/data/track_metrics.csv", index=False)
 
 
 if __name__ == "__main__":

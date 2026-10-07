@@ -22,8 +22,8 @@ def within_subjects_pairwise(paired_data, shapiro_results, metrics):
     for metric in metrics:
         data = paired_data[[f"{metric}_T1", f"{metric}_T2"]].dropna()
 
-        t1 = paired_data[f"{metric}_T1"].dropna()
-        t2 = paired_data[f"{metric}_T2"].dropna()   
+        t1 = paired_data[f"{metric}_T1"]
+        t2 = paired_data[f"{metric}_T2"]   
 
 
         # Extract normality result from Shapiro-Wilk test results
