@@ -1,11 +1,18 @@
+import os
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-RESULTS_DIR = "/home/appuser/data/lmm"
-iv = ["track", "control_mode"]
+RESULTS_DIR = "/home/appuser/data/analysis_2"
+FIGURES_DIR = f"{RESULTS_DIR}/figures"
+os.makedirs(RESULTS_DIR, exist_ok=True)
+os.makedirs(FIGURES_DIR, exist_ok=True)
 
+
+# iv = ["track", "control_mode"]
+iv = "control_mode"
 
 
 def compute_correlation_matrix(df, metrics):
@@ -50,14 +57,14 @@ def compute_histograms(df, metrics):
     fig, axes = plt.subplots(2, 4, figsize=(18,9))
     axes = axes.flatten()
 
-    # LMM
-    df = df.copy()
-    df["track_mode"] = df["track"] + "_" + df["control_mode"]
+    # # LMM
+    # df = df.copy()
+    # df["track_mode"] = df["track"] + "_" + df["control_mode"]
 
     for ax, metric in zip(axes, metrics):
-        # sns.histplot(data=df, x=metric, hue=iv, bins=15, kde=True, element="step", stat="density", common_norm=False, ax=ax)
+        sns.histplot(data=df, x=metric, hue=iv, bins=15, kde=True, element="step", stat="density", common_norm=False, ax=ax)
         # LMM
-        sns.histplot(data=df, x=metric, hue="track_mode", bins=15, kde=True, element="step", stat="density", common_norm=False, ax=ax)
+        # sns.histplot(data=df, x=metric, hue="track_mode", bins=15, kde=True, element="step", stat="density", common_norm=False, ax=ax)
 
         ax.set_title(metric)
         ax.set_xlabel("")
@@ -67,9 +74,8 @@ def compute_histograms(df, metrics):
 
     plt.tight_layout()
 
-    fig.savefig(f"{RESULTS_DIR}/figures/histograms.png", dpi=300, bbox_inches='tight')
+    fig.savefig(f"{FIGURES_DIR}/histograms.png", dpi=300, bbox_inches='tight')
 
-    # plt.show()
 
 
 
@@ -78,13 +84,13 @@ def compute_boxplots(df, metrics):
     axes = axes.flatten()
 
     # LMM
-    df = df.copy()
-    df["track_mode"] = df["track"] + "_" + df["control_mode"]
+    # df = df.copy()
+    # df["track_mode"] = df["track"] + "_" + df["control_mode"]
 
     for ax, metric in zip(axes, metrics):
-        # sns.boxplot(data=df, x=iv, y=metric, ax=ax)
+        sns.boxplot(data=df, x=iv, y=metric, ax=ax)
         # LMM
-        sns.boxplot(data=df, x="track_mode", y=metric, ax=ax)
+        #sns.boxplot(data=df, x="track_mode", y=metric, ax=ax)
 
         ax.tick_params(axis='x', rotation=45)
         ax.set_title(metric)
@@ -95,17 +101,14 @@ def compute_boxplots(df, metrics):
 
     plt.tight_layout()
 
-    fig.savefig(f"{RESULTS_DIR}/figures/boxplots.png", dpi=300, bbox_inches='tight')
+    fig.savefig(f"{FIGURES_DIR}/boxplots.png", dpi=300, bbox_inches='tight')
 
-    # plt.show()
 
 
 
 
 def main():
     # Load the CSV file into a DataFrame
-    # metrics_path = f"/home/appuser/data/metrics.csv"
-    # metrics_path = f"/home/appuser/data/balanced_T1/balanced_subset_T1.csv"
     metrics_path = f"/home/appuser/data/metrics.csv"
     df = pd.read_csv(metrics_path)
 
@@ -120,14 +123,6 @@ def main():
         "segment_error"
     ]
 
-
-    # allocation = (
-    #     df.groupby(["track", "control_mode"])
-    #     .size()
-    #     .unstack(fill_value=0)
-    # )
-
-    # print(allocation)
 
     compute_correlation_matrix(df, metrics)
     compute_stats(df, metrics)

@@ -9,9 +9,9 @@ from statsmodels.stats.multitest import multipletests
 from statsmodels.stats.oneway import anova_oneway
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 
-RESULTS_DIR = "/home/appuser/data/track_analysis_selected"
+RESULTS_DIR = "/home/appuser/data/analysis_2"
 
-iv = "track"
+iv = "control_mode"
 ALPHA = 0.05
 ALPHA2 = 0.045
 
@@ -88,14 +88,18 @@ def within_subjects_omnibus(df, metrics, shapiro_results, sphericity_results):
 
     for metric in metrics:
         data = df[[ "participant_id", iv, metric]].dropna()
-        wide = data.pivot(index="participant_id", columns=iv, values=metric).dropna()
-        data = wide.reset_index().melt(id_vars="participant_id", var_name=iv, value_name=metric)
 
         # Extract normality result from Shapiro-Wilk test results
         normality = shapiro_results.loc[shapiro_results["metric"] == metric, "normality"].values[0]
 
+
         # Extract sphericity result from Mauchly's test results
         sphericity = sphericity_results.loc[sphericity_results["metric"] == metric, "sphericity"].values[0]
+
+        normality = "Not Normal"
+        sphericity = "No Sphericity"
+
+
 
         # Main test
         if normality == "Normal" and sphericity == "Sphericity":
@@ -117,8 +121,9 @@ def within_subjects_omnibus(df, metrics, shapiro_results, sphericity_results):
 
         else:
             # Friedman test
-            modes = list(data.columns)
-            samples = [data[mode].values for mode in modes]
+            wide = data.pivot(index="participant_id", columns=iv, values=metric).dropna()
+            modes = list(wide.columns)
+            samples = [wide[mode].values for mode in modes]
 
             statistic, p_value = stats.friedmanchisquare(*samples)
 
@@ -522,8 +527,7 @@ def post_hoc_between(df, main_test_results, metrics):
 
 
 def main():
-    # metrics_path = "/home/appuser/data/metrics.csv"
-    metrics_path = "/home/appuser/data/track_analysis_selected/metrics_selected.csv"
+    metrics_path = "/home/appuser/data/metrics.csv"
     df = pd.read_csv(metrics_path)
 
     shapiro_results_path = f"{RESULTS_DIR}/shapiro_wilk_results.csv"
@@ -544,15 +548,15 @@ def main():
 
     
     # Track analysis
-    paired_data_path = f"{RESULTS_DIR}/paired_data.csv"
-    paired_data = pd.read_csv(paired_data_path)
-    within_subjects_pairwise(paired_data, shapiro_results, metrics)
+    # paired_data_path = f"{RESULTS_DIR}/paired_data.csv"
+    # paired_data = pd.read_csv(paired_data_path)
+    # within_subjects_pairwise(paired_data, shapiro_results, metrics)
 
     # Control analysis
-    # sphericity_results_path = f"{RESULTS_DIR}/sphericity_results.csv"
-    # sphericity_results = pd.read_csv(sphericity_results_path)
-    # results = within_subjects(df, metrics, shapiro_results, sphericity_results)
-    # post_hoc_tests(df, results, metrics)
+    sphericity_results_path = f"{RESULTS_DIR}/sphericity_results.csv"
+    sphericity_results = pd.read_csv(sphericity_results_path)
+    results = within_subjects_omnibus(df, metrics, shapiro_results, sphericity_results)
+    post_hoc_within(df, results, metrics)
 
     # Per-track control analysis
     # levene_results_path = f"{RESULTS_DIR}/levene_results.csv"
