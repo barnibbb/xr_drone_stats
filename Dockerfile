@@ -92,6 +92,7 @@ RUN apt-get update && \
 
 USER appuser
 RUN pip install --no-cache-dir \
+    bambi \
     matplotlib \
     numpy \
     openpyxl \

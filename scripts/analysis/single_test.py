@@ -48,9 +48,11 @@ def load_measurement(trajectory_file):
     trajectory = data['trajectory']
     waypoints = data['waypoints']
 
-    print(f"Loaded {len(trajectory)} trajectory points and {len(waypoints)} waypoints.")
+    collision_count = len(data.get("collisions") or [])
 
-    return trajectory, waypoints
+    print(f"Loaded {len(trajectory)} trajectory points and {len(waypoints)} waypoints and {collision_count} collisions.")
+
+    return trajectory, waypoints, collision_count
 
 
 def load_physical(filename):
@@ -313,7 +315,7 @@ def reference_path_error(positions, reference_points, n_samples=100):
 def evaluate_trajectory(trajectory_file, offset_file, physical_file):
     # Load input
     offset = load_offset(offset_file)
-    trajectory, waypoints = load_measurement(trajectory_file)
+    trajectory, waypoints, collision_count = load_measurement(trajectory_file)
     physical_positions = load_physical(physical_file)
 
     # Extract timestamps and positions from trajectory
@@ -388,7 +390,8 @@ def evaluate_trajectory(trajectory_file, offset_file, physical_file):
         "rms_jerk": rms_jerk,
         "path_efficiency": path_efficiency,
         "ordered_error": median_waypoint_error_ordered,
-        "segment_error": median_waypoint_error_segment
+        "segment_error": median_waypoint_error_segment,
+        "collision_count": collision_count
     }
 
 
