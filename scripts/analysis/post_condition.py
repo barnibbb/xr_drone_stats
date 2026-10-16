@@ -5,6 +5,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from scipy.stats import friedmanchisquare, wilcoxon, norm
+from statsmodels.stats.multitest import multipletests
+from itertools import combinations
 
 WORK_DIR = Path("/home/appuser/data/post_condition")
 INPUT_FILE = WORK_DIR / "post_condition_answers.csv"
@@ -15,10 +18,10 @@ PARTICIPANT_COL = "Participant ID"
 CONTROL_COL = "Control Mode"
 
 CONTROL_ORDER = [
-    "A: Pinch control",
-    "B: Palm control",
-    "C: Joy control",
-    "D: Drone-in-the-middle control"
+    "pinch",
+    "palm",
+    "joy",
+    "holo_joy"
 ]
 
 SCALE_MIN = 1
@@ -186,6 +189,125 @@ def heatmap(long_df):
     plt.close(fig)
 
 
+def friedman_test(long_df):
+    results = []
+
+    for question in QUESTIONS:
+        question_df = long_df[long_df["Question"] == question]
+        pivot_df = question_df.pivot(index=PARTICIPANT_COL, columns=CONTROL_COL, values="Rating")
+        pivot_df = pivot_df[CONTROL_ORDER]  # Ensure the columns are in the specified order
+
+        values = [pivot_df.to_numpy() for mode in CONTROL_ORDER]
+
+        stat, p_value = friedmanchisquare(*[pivot_df[control].dropna() for control in CONTROL_ORDER])
+
+        n = len(pivot_df)
+        k = len(CONTROL_ORDER)
+
+        kendall_w = stat / (n * (k - 1))
+
+        results.append({
+            "Question": question,
+            "Friedman_statistic": stat,
+            "p_value": p_value,
+            "significant": "Yes" if p_value < 0.05 else "No",
+            "Kendall_W": kendall_w
+        })
+
+    results_df = pd.DataFrame(results)
+
+    results_df["p_holm"] = multipletests(results_df["p_value"], method="holm")[1]
+    results_df["holm_significant"] = results_df["p_holm"].apply(lambda p: "Yes" if p < 0.05 else "No")
+
+    results_df.to_csv(WORK_DIR / "post_condition_friedman_test_results.csv", index=False)
+
+    return results_df
+
+
+def pairwise_wilcoxon(long_df):
+    results = []
+
+    for question in QUESTIONS:
+        question_df = long_df[long_df["Question"] == question]
+        
+        pivot_df = question_df.pivot(index=PARTICIPANT_COL, columns=CONTROL_COL, values="Rating")
+
+        for mode_a, mode_b in combinations(CONTROL_ORDER, 2):
+            a = pivot_df[mode_a]
+            b = pivot_df[mode_b]
+
+            stat, p_value = wilcoxon(a, b, alternative='two-sided')
+
+            differences = a - b
+            n_nonzero = np.count_nonzero(differences)
+
+            z = norm.isf(p_value / 2)
+            effect_size = z / np.sqrt(n_nonzero)
+
+            results.append({
+                "Question": question,
+                "Mode_A": mode_a,
+                "Mode_B": mode_b,
+                "Wilcoxon_statistic": stat,
+                "effect_size": effect_size,
+                "p_value": p_value,
+                "significant": "Yes" if p_value < 0.05 else "No"
+            })
+
+    results_df = pd.DataFrame(results)
+
+    results_df["p_holm"] = (results_df.groupby("Question")["p_value"]
+                            .transform(lambda p: multipletests(p, method="holm")[1]))
+
+    results_df["holm_significant"] = results_df["p_holm"].apply(lambda p: "Yes" if p < 0.05 else "No")
+
+    results_df.to_csv(WORK_DIR / "post_condition_pairwise_wilcoxon_results.csv", index=False)
+    return results_df
+
+
+def significance_matrix(long_df, results_df):
+    results_df["pairing"] = results_df["Mode_A"] + " vs " + results_df["Mode_B"]
+
+    directions = []
+
+    for _, row in results_df.iterrows():
+        question_df = long_df[long_df["Question"] == row["Question"]]
+
+        pivot_df = question_df.pivot(index=PARTICIPANT_COL, columns=CONTROL_COL, values="Rating")
+
+        differences = pivot_df[row["Mode_A"]] - pivot_df[row["Mode_B"]]
+        median_diff = np.median(differences)
+
+        if not row["holm_significant"]:
+            symbol = "-"
+        elif median_diff > 0:
+            symbol = ">"
+        elif median_diff < 0:
+            symbol = "<"
+        else:
+            symbol = "-"
+
+        directions.append(symbol)
+
+    results_df["direction"] = directions
+
+    significance_matrix = (
+        results_df.pivot(
+            index="pairing",
+            columns="Question",
+            values="direction"
+        )
+        .reindex(
+            index=[
+                f"{a} vs {b}"
+                for a, b in combinations(CONTROL_ORDER, 2)
+                ],
+                columns=QUESTIONS
+        )
+    )
+
+    significance_matrix.to_csv(WORK_DIR / "post_condition_significance_matrix.csv")
+
 
 def main():
     df = load_data()
@@ -194,6 +316,11 @@ def main():
     plot_boxplots(long_df)
     response_distribution(long_df)
     heatmap(long_df)
+
+    friedman_results = friedman_test(long_df)
+    wilcoxon_results = pairwise_wilcoxon(long_df)
+
+    significance_matrix(long_df, wilcoxon_results)
 
 
 if __name__ == "__main__":
